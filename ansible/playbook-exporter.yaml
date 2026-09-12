@@ -1,0 +1,5 @@
+- name: Pasang node_exporter pada web server
+  hosts: web
+  become: true
+  roles:
+    - prometheus.prometheus.node_exporter

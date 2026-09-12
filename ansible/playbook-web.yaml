@@ -1,0 +1,36 @@
+- name: Sediakan web server dengan container aplikasi
+  hosts: web
+  become: true
+
+  vars:
+    app_container_name: devops-app
+    app_port: 80
+
+  roles:
+    - geerlingguy.docker
+
+  tasks:
+    - name: Dapatkan region dan registry dari imej ECR
+      set_fact:
+        ecr_registry: "{{ ecr_image | regex_replace('/.*$', '') }}"
+
+    # Tiada kunci dalam playbook -- instance role devops-web-role yang benarkan
+    # tarik imej dari ECR.
+    - name: Log masuk ke ECR
+      shell: >
+        aws ecr get-login-password --region {{ ansible_aws_ssm_region | default('ap-southeast-1') }}
+        | docker login --username AWS --password-stdin {{ ecr_registry }}
+      register: ecr_login
+      changed_when: false
+
+    # Guna modul docker_container, bukan `command: docker run`, supaya main ini
+    # idempotent -- larian kedua lapor ok, bukan changed.
+    - name: Naikkan container aplikasi
+      community.docker.docker_container:
+        name: "{{ app_container_name }}"
+        image: "{{ ecr_image }}"
+        state: started
+        pull: true
+        restart_policy: unless-stopped
+        ports:
+          - "{{ app_port }}:80"

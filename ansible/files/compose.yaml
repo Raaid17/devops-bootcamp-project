@@ -1,0 +1,32 @@
+services:
+  prometheus:
+    image: prom/prometheus
+    # Bind mount: fail konfigurasi pada host masuk ke dalam container.
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+    # Tiada `ports:` -- Grafana TIDAK didedahkan pada host. Cloudflare Tunnel
+    # sampai kepadanya melalui rangkaian compose ini sahaja.
+    volumes:
+      # Named volume: data Grafana kekal walau container dibuang.
+      - grafana-data:/var/lib/grafana
+      - ./provisioning:/etc/grafana/provisioning
+      - ./dashboards:/var/lib/grafana/dashboards
+    environment:
+      GF_SERVER_ROOT_URL: "https://monitoring.sirbutterfinger.com"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    depends_on:
+      - grafana
+    restart: unless-stopped
+
+volumes:
+  grafana-data:

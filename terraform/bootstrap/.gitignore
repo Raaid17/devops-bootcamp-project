@@ -1,0 +1,5 @@
+# Local state — this stack deliberately has no remote backend.
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl

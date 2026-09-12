@@ -1,0 +1,70 @@
+- name: Naikkan stack pemantauan sebagai container
+  hosts: monitoring
+  become: true
+
+  vars:
+    stack_dir: /opt/monitoring
+    tunnel_token_parameter: /devops-bootcamp-2026/final-project/tunnel-token
+
+  roles:
+    - geerlingguy.docker
+
+  tasks:
+    - name: Cipta folder stack
+      file:
+        path: "{{ stack_dir }}"
+        state: directory
+        mode: "0755"
+
+    # Token tunnel tidak pernah masuk ke dalam repo -- instance role
+    # devops-monitoring-role benarkan baca satu parameter ini sahaja.
+    - name: Baca token Cloudflare Tunnel dari SSM Parameter Store
+      shell: >
+        aws ssm get-parameter --name {{ tunnel_token_parameter }}
+        --with-decryption --region {{ ansible_aws_ssm_region | default('ap-southeast-1') }}
+        --query Parameter.Value --output text
+      register: tunnel_token
+      changed_when: false
+      no_log: true
+
+    - name: Hantar fail konfigurasi stack
+      copy:
+        src: "files/{{ item }}"
+        dest: "{{ stack_dir }}/{{ item }}"
+        mode: "0644"
+      loop:
+        - compose.yaml
+        - prometheus.yaml
+      notify: Naikkan semula stack
+
+    - name: Hantar folder provisioning dan dashboard Grafana
+      copy:
+        src: "files/{{ item }}/"
+        dest: "{{ stack_dir }}/{{ item }}/"
+        mode: "0644"
+      loop:
+        - provisioning
+        - dashboards
+      notify: Naikkan semula stack
+
+    - name: Tulis fail .env untuk compose
+      copy:
+        content: "TUNNEL_TOKEN={{ tunnel_token.stdout }}\n"
+        dest: "{{ stack_dir }}/.env"
+        mode: "0600"
+      no_log: true
+      notify: Naikkan semula stack
+
+    # docker_compose_v2 bukan `command: docker compose up` -- supaya larian
+    # kedua lapor ok, bukan changed.
+    - name: Naikkan stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ stack_dir }}"
+        state: present
+        pull: missing
+
+  handlers:
+    - name: Naikkan semula stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ stack_dir }}"
+        state: restarted
