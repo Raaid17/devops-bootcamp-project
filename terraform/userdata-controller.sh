@@ -49,7 +49,7 @@ dpkg -i /tmp/session-manager-plugin.deb
 rm -f /tmp/session-manager-plugin.deb
 
 # Collections/roles the playbooks depend on, installed for the ubuntu user
-sudo -u ubuntu ansible-galaxy collection install amazon.aws community.docker prometheus.prometheus
+sudo -u ubuntu ansible-galaxy collection install community.aws community.docker prometheus.prometheus
 sudo -u ubuntu ansible-galaxy role install geerlingguy.docker
 
 touch /var/lib/controller-bootstrap-done
