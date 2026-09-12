@@ -1,5 +1,5 @@
 variable "region" {
-  description = "AWS region for every resource in this project."
+  description = "AWS region for every resource in this project (ap-southeast-1)."
   type        = string
   default     = "ap-southeast-1"
 }
