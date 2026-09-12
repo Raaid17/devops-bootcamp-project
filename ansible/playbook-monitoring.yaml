@@ -10,6 +10,9 @@
     - geerlingguy.docker
 
   tasks:
+    - name: Pasang AWS CLI v2
+      include_tasks: tasks/aws-cli.yaml
+
     - name: Cipta folder stack
       file:
         path: "{{ stack_dir }}"
@@ -20,7 +23,7 @@
     # devops-monitoring-role benarkan baca satu parameter ini sahaja.
     - name: Baca token Cloudflare Tunnel dari SSM Parameter Store
       shell: >
-        aws ssm get-parameter --name {{ tunnel_token_parameter }}
+        /usr/local/bin/aws ssm get-parameter --name {{ tunnel_token_parameter }}
         --with-decryption --region {{ ansible_aws_ssm_region | default('ap-southeast-1') }}
         --query Parameter.Value --output text
       register: tunnel_token

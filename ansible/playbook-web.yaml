@@ -10,6 +10,9 @@
     - geerlingguy.docker
 
   tasks:
+    - name: Pasang AWS CLI v2
+      include_tasks: tasks/aws-cli.yaml
+
     - name: Dapatkan region dan registry dari imej ECR
       set_fact:
         ecr_registry: "{{ ecr_image | regex_replace('/.*$', '') }}"
@@ -18,7 +21,7 @@
     # tarik imej dari ECR.
     - name: Log masuk ke ECR
       shell: >
-        aws ecr get-login-password --region {{ ansible_aws_ssm_region | default('ap-southeast-1') }}
+        /usr/local/bin/aws ecr get-login-password --region {{ ansible_aws_ssm_region | default('ap-southeast-1') }}
         | docker login --username AWS --password-stdin {{ ecr_registry }}
       register: ecr_login
       changed_when: false
