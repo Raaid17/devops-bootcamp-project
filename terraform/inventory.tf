@@ -7,7 +7,7 @@ resource "local_file" "inventory" {
     web_id                = module.web.id
     monitoring_id         = module.monitoring.id
     region                = var.region
-    state_bucket          = var.state_bucket
+    transfer_bucket       = aws_s3_bucket.ansible_transfer.id
     web_private_ip        = var.web_private_ip
     monitoring_private_ip = var.monitoring_private_ip
     ecr_image             = "${aws_ecr_repository.app.repository_url}:latest"
