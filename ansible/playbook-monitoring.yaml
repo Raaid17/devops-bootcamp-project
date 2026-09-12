@@ -28,7 +28,20 @@
         --query Parameter.Value --output text
       register: tunnel_token
       changed_when: false
+      failed_when: false
       no_log: true
+
+    # Stack pemantauan tetap naik walaupun tunnel belum dicipta.
+    - name: Tentukan sama ada tunnel boleh dinaikkan
+      set_fact:
+        tunnel_ready: "{{ tunnel_token.rc == 0 and tunnel_token.stdout | default('') | length > 0 }}"
+
+    - name: Beritahu jika tunnel dilangkau
+      debug:
+        msg: >-
+          Token tunnel tiada dalam {{ tunnel_token_parameter }} --
+          Prometheus dan Grafana akan naik, cloudflared dilangkau.
+      when: not tunnel_ready
 
     - name: Hantar fail konfigurasi stack
       copy:
@@ -52,7 +65,7 @@
 
     - name: Tulis fail .env untuk compose
       copy:
-        content: "TUNNEL_TOKEN={{ tunnel_token.stdout }}\n"
+        content: "TUNNEL_TOKEN={{ tunnel_token.stdout | default('') }}\n"
         dest: "{{ stack_dir }}/.env"
         mode: "0600"
       no_log: true
@@ -65,9 +78,11 @@
         project_src: "{{ stack_dir }}"
         state: present
         pull: missing
+        profiles: "{{ ['tunnel'] if tunnel_ready else [] }}"
 
   handlers:
     - name: Naikkan semula stack
       community.docker.docker_compose_v2:
         project_src: "{{ stack_dir }}"
         state: restarted
+        profiles: "{{ ['tunnel'] if tunnel_ready else [] }}"

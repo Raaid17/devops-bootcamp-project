@@ -23,6 +23,9 @@ services:
 
   cloudflared:
     image: cloudflare/cloudflared:latest
+    # Profile so Prometheus + Grafana can come up before the Cloudflare Tunnel
+    # exists. Enabled by the playbook once the token is in Parameter Store.
+    profiles: ["tunnel"]
     command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
     depends_on:
       - grafana
