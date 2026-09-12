@@ -5,6 +5,9 @@
   vars:
     app_container_name: devops-app
     app_port: 80
+    # Idempotent by default: a re-run must report ok, not changed. Pass
+    # -e app_pull=true to force a fresh pull when rolling out a new image.
+    app_pull: false
 
   roles:
     - geerlingguy.docker
@@ -33,7 +36,7 @@
         name: "{{ app_container_name }}"
         image: "{{ ecr_image }}"
         state: started
-        pull: true
+        pull: "{{ app_pull | bool }}"
         restart_policy: unless-stopped
         ports:
           - "{{ app_port }}:80"
