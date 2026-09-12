@@ -69,3 +69,21 @@ variable "tunnel_token_parameter" {
   type        = string
   default     = "/devops-bootcamp-2026/final-project/tunnel-token"
 }
+
+variable "github_subject_patterns" {
+  description = <<-EOT
+    Allowed values of the OIDC `sub` claim.
+
+    GitHub now issues subjects carrying immutable numeric IDs, e.g.
+    "repo:Raaid17@134477393/devops-bootcamp-project@1367038314:ref:refs/heads/main".
+    Almost every tutorial still shows the older "repo:owner/name:*" form, which
+    simply does not match any more. Both are listed so the role works whichever
+    format the token carries; the ID form is the stronger pin, because a repo
+    can be renamed or transferred but its id cannot.
+  EOT
+  type        = list(string)
+  default = [
+    "repo:Raaid17@134477393/devops-bootcamp-project@1367038314:*",
+    "repo:Raaid17/devops-bootcamp-project:*",
+  ]
+}

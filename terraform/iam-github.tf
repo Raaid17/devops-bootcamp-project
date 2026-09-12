@@ -25,7 +25,7 @@ resource "aws_iam_role" "github_actions" {
         # Pinned to this one repo. Without the sub condition ANY GitHub repo in
         # the world could assume this role.
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:*"
+          "token.actions.githubusercontent.com:sub" = var.github_subject_patterns
         }
       }
     }]
@@ -92,8 +92,10 @@ resource "aws_iam_role" "github_plan" {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
+        # Pinned to this one repo. Without the sub condition ANY GitHub repo in
+        # the world could assume this role.
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:*"
+          "token.actions.githubusercontent.com:sub" = var.github_subject_patterns
         }
       }
     }]
