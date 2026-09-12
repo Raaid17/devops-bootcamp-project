@@ -75,3 +75,32 @@ resource "aws_iam_role_policy" "github_actions" {
     ]
   })
 }
+
+# A second, read-only role for the PR plan gate. Kept separate from the deploy
+# role so a pull request can never push an image or run a command on a server --
+# plan reads, deploy writes, and neither can do the other's job.
+resource "aws_iam_role" "github_plan" {
+  name = "devops-github-plan-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+        }
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:*"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "github_plan_readonly" {
+  role       = aws_iam_role.github_plan.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}

@@ -21,3 +21,8 @@ output "controller_session_command" {
   description = "How to get onto the controller — the only way in."
   value       = "aws ssm start-session --target ${module.controller.id} --region ${var.region}"
 }
+
+output "github_plan_role_arn" {
+  description = "Read-only role for the PR plan gate."
+  value       = aws_iam_role.github_plan.arn
+}

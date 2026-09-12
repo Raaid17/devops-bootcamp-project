@@ -1,0 +1,66 @@
+name: plan
+
+# Gate on pull requests: formatting, validation, and a real plan against AWS --
+# using a READ-ONLY role, so opening a PR can never change infrastructure.
+on:
+  pull_request:
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/plan.yaml'
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: terraform fmt
+        run: terraform fmt -check -recursive -diff
+
+  plan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - run: terraform init -input=false
+
+      - run: terraform validate -no-color
+
+      # -lock=false: the role is read-only and cannot write the S3 lock, and a
+      # plan has nothing to protect anyway.
+      - name: terraform plan
+        id: plan
+        run: terraform plan -no-color -input=false -lock=false
+        continue-on-error: true
+
+      - name: Comment plan on the PR
+        uses: actions/github-script@v7
+        env:
+          PLAN: ${{ steps.plan.outputs.stdout }}
+        with:
+          script: |
+            const plan = (process.env.PLAN || '').slice(0, 60000);
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `#### \`terraform plan\`\n\n<details><summary>Show plan</summary>\n\n\`\`\`terraform\n${plan}\n\`\`\`\n\n</details>`,
+            });
+
+      - name: Fail the job if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1

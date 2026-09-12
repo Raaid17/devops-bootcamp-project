@@ -1,0 +1,120 @@
+name: deploy
+
+# test -> build+push to ECR -> tell the web server to pull and restart.
+# No long-lived AWS keys: OIDC mints a short-lived credential per run.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/deploy.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm clean-install
+      - run: npm run test
+
+  build-push:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+
+      - name: Work out the image tags
+        id: meta
+        run: |
+          REG=${{ steps.ecr.outputs.registry }}
+          # ECR repository names must be lowercase; keep it out of the branch name.
+          REPO=${{ vars.ECR_REPOSITORY }}
+          echo "image=$REG/$REPO" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: app
+          push: true
+          # Both tags: :latest for the server to pull, the SHA so a bad deploy
+          # can be rolled back to a specific build.
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # No SSH and no self-hosted runner: the deploy is an SSM command, scoped
+      # by IAM to this one instance.
+      - name: Pull and restart on the web server
+        run: |
+          set -euo pipefail
+          IMAGE="${{ needs.build-push.outputs.image }}:${{ github.sha }}"
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "${{ vars.WEB_INSTANCE_ID }}" \
+            --document-name AWS-RunShellScript \
+            --comment "deploy ${{ github.sha }}" \
+            --parameters "commands=[
+              'set -e',
+              'aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${{ needs.build-push.outputs.image }}',
+              'docker pull $IMAGE',
+              'docker rm -f devops-app || true',
+              'docker run -d --name devops-app --restart unless-stopped -p 80:80 $IMAGE'
+            ]" \
+            --query Command.CommandId --output text)
+          echo "command: $CMD_ID"
+
+          for i in $(seq 1 60); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$CMD_ID" \
+              --instance-id "${{ vars.WEB_INSTANCE_ID }}" \
+              --query Status --output text 2>/dev/null || echo Pending)
+            case "$STATUS" in
+              Success) echo "deploy ok"; break ;;
+              Failed|TimedOut|Cancelled)
+                aws ssm get-command-invocation --command-id "$CMD_ID" \
+                  --instance-id "${{ vars.WEB_INSTANCE_ID }}" \
+                  --query StandardErrorContent --output text
+                exit 1 ;;
+            esac
+            sleep 5
+          done
+          [ "$STATUS" = "Success" ] || { echo "timed out waiting for the deploy"; exit 1; }
+
+      - name: Smoke test through the public address
+        run: |
+          for i in $(seq 1 20); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://${{ vars.WEB_ELASTIC_IP }}/" || true)
+            [ "$CODE" = "200" ] && { echo "serving 200"; exit 0; }
+            sleep 5
+          done
+          echo "web server did not return 200"; exit 1
