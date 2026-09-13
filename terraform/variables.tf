@@ -46,11 +46,6 @@ variable "monitoring_private_ip" {
   default     = "10.0.0.136"
 }
 
-variable "state_bucket" {
-  description = "Terraform state bucket, reused as the aws_ssm connection plugin's file-transfer bucket."
-  type        = string
-  default     = "devops-bootcamp-terraform-raaid17"
-}
 
 variable "ecr_repository_name" {
   description = "Private ECR repository holding the app image. Must be lowercase."

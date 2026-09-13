@@ -1,0 +1,17 @@
+# Collections and roles the playbooks need. Pinned to the majors verified
+# against ansible-core 2.21 -- install with:
+#   ansible-galaxy install -r requirements.yml
+collections:
+  # aws_ssm connection plugin (moved here from community.aws). Needs core >= 2.17.
+  - name: amazon.aws
+    version: ">=11.4.0,<12.0.0"
+  # docker_container / docker_compose_v2. 5.x needs core >= 2.17.
+  - name: community.docker
+    version: ">=5.3.0,<6.0.0"
+  # node_exporter role. Supports core up to 2.21.x only -- see userdata pin.
+  - name: prometheus.prometheus
+    version: ">=0.30.1,<1.0.0"
+
+roles:
+  - name: geerlingguy.docker
+    version: "8.0.0"

@@ -1,10 +1,11 @@
 # OIDC instead of long-lived access keys in GitHub secrets: Actions presents a
 # short-lived token, AWS verifies it, no credential ever sits in the repo.
 
+# No thumbprint_list: for GitHub, IAM validates against its own library of
+# trusted root CAs and ignores any configured thumbprints.
 resource "aws_iam_openid_connect_provider" "github" {
-  url             = "https://token.actions.githubusercontent.com"
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
 
   tags = { Name = "github-actions-oidc" }
 }
