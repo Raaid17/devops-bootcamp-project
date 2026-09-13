@@ -5,6 +5,11 @@ server, Ansible mengkonfigurasi semuanya dari controller peribadi **tanpa SSH**,
 berjalan sebagai container dari imej ECR peribadi, Prometheus dan Grafana memantau sebagai
 container, dan Cloudflare mendedahkan kedua-dua perkhidmatan.
 
+> **Penafian:** Projek ini dibangunkan dengan bantuan **Claude Code**, pembantu pengekodan AI
+> oleh Anthropic. Kod Terraform, playbook Ansible, workflow CI/CD dan dokumentasi ditulis
+> bersama Claude Code, berdasarkan latihan bootcamp saya sendiri, dan setiap perubahan
+> melalui pull request dengan semakan `terraform fmt` dan `terraform plan`.
+
 ## Tiga URL
 
 | | Pautan |
