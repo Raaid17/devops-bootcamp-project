@@ -12,6 +12,7 @@ container, dan Cloudflare mendedahkan kedua-dua perkhidmatan.
 | 🌐 **Aplikasi** | https://web.sirbutterfinger.com |
 | 📊 **Monitoring** | https://monitoring.sirbutterfinger.com |
 | 📦 **Repo** | https://github.com/Raaid17/devops-bootcamp-project |
+| 📘 **Dokumentasi** | https://docs.sirbutterfinger.com |
 
 ## Arkitektur
 
