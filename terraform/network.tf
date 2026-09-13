@@ -1,84 +1,101 @@
-# Raw resources rather than terraform-aws-modules/vpc: the brief grades the exact
-# names devops-public-route / devops-private-route, and the module derives route
-# table names from a subnet suffix pattern that cannot produce them.
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 6.7"
 
-resource "aws_vpc" "main" {
-  cidr_block           = var.vpc_cidr
-  enable_dns_support   = true
-  enable_dns_hostnames = true
+  name = "devops-vpc"
+  cidr = var.vpc_cidr
+  azs  = [var.az]
 
-  tags = { Name = "devops-vpc" }
-}
+  public_subnets       = [var.public_subnet_cidr]
+  public_subnet_names  = ["devops-public-subnet"]
+  private_subnets      = [var.private_subnet_cidr]
+  private_subnet_names = ["devops-private-subnet"]
 
-resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_cidr
-  availability_zone       = var.az
   map_public_ip_on_launch = true
 
-  tags = { Name = "devops-public-subnet" }
+  # One NAT gateway in the public subnet serves the private subnet, so the
+  # controller and monitoring server can reach SSM, ECR and Cloudflare without
+  # being reachable inbound.
+  enable_nat_gateway = true
+  single_nat_gateway = true
+
+  # The brief grades these exact names. The module's own Name tag comes first in
+  # its merge, so these override it.
+  igw_tags                 = { Name = "devops-igw" }
+  nat_gateway_tags         = { Name = "devops-ngw" }
+  nat_eip_tags             = { Name = "devops-ngw-eip" }
+  public_route_table_tags  = { Name = "devops-public-route" }
+  private_route_table_tags = { Name = "devops-private-route" }
+
+  # Leave the VPC's AWS-created default security group, NACL and route table
+  # alone; nothing here uses them.
+  manage_default_security_group = false
+  manage_default_network_acl    = false
+  manage_default_route_table    = false
 }
 
-resource "aws_subnet" "private" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = var.private_subnet_cidr
-  availability_zone = var.az
+# --- One-off migration from the earlier hand-written resources -----------------
+# These tell Terraform the existing network now lives inside the module, so it is
+# re-labelled instead of destroyed and rebuilt. Remove once applied.
 
-  tags = { Name = "devops-private-subnet" }
+moved {
+  from = aws_vpc.main
+  to   = module.vpc.aws_vpc.this[0]
 }
 
-resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
-
-  tags = { Name = "devops-igw" }
+moved {
+  from = aws_subnet.public
+  to   = module.vpc.aws_subnet.public[0]
 }
 
-# NAT lives in the PUBLIC subnet but serves the private one — this is the bit
-# that lets the controller and monitoring server reach SSM, ECR and Cloudflare
-# without anything being reachable inbound.
-resource "aws_eip" "nat" {
-  domain     = "vpc"
-  depends_on = [aws_internet_gateway.main]
-
-  tags = { Name = "devops-ngw-eip" }
+moved {
+  from = aws_subnet.private
+  to   = module.vpc.aws_subnet.private[0]
 }
 
-resource "aws_nat_gateway" "main" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public.id
-  depends_on    = [aws_internet_gateway.main]
-
-  tags = { Name = "devops-ngw" }
+moved {
+  from = aws_internet_gateway.main
+  to   = module.vpc.aws_internet_gateway.this[0]
 }
 
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.main.id
-  }
-
-  tags = { Name = "devops-public-route" }
+moved {
+  from = aws_eip.nat
+  to   = module.vpc.aws_eip.nat[0]
 }
 
-resource "aws_route_table" "private" {
-  vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main.id
-  }
-
-  tags = { Name = "devops-private-route" }
+moved {
+  from = aws_nat_gateway.main
+  to   = module.vpc.aws_nat_gateway.this[0]
 }
 
-resource "aws_route_table_association" "public" {
-  subnet_id      = aws_subnet.public.id
-  route_table_id = aws_route_table.public.id
+moved {
+  from = aws_route_table.public
+  to   = module.vpc.aws_route_table.public[0]
 }
 
-resource "aws_route_table_association" "private" {
-  subnet_id      = aws_subnet.private.id
-  route_table_id = aws_route_table.private.id
+moved {
+  from = aws_route_table.private
+  to   = module.vpc.aws_route_table.private[0]
+}
+
+moved {
+  from = aws_route_table_association.public
+  to   = module.vpc.aws_route_table_association.public[0]
+}
+
+moved {
+  from = aws_route_table_association.private
+  to   = module.vpc.aws_route_table_association.private[0]
+}
+
+# The old route tables declared their 0.0.0.0/0 routes inline; the module manages
+# them as separate aws_route resources, so adopt the existing routes.
+import {
+  to = module.vpc.aws_route.public_internet_gateway[0]
+  id = "rtb-0add9181a373ce846_0.0.0.0/0"
+}
+
+import {
+  to = module.vpc.aws_route.private_nat_gateway[0]
+  id = "rtb-0cad6ce3681f7734c_0.0.0.0/0"
 }
