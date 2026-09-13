@@ -58,35 +58,3 @@ module "private_sg" {
 
   tags = { Name = "devops-private-sg" }
 }
-
-# --- One-off migration from the earlier hand-written resources. Remove once applied.
-
-moved {
-  from = aws_security_group.public
-  to   = module.public_sg.aws_security_group.this[0]
-}
-
-moved {
-  from = aws_vpc_security_group_ingress_rule.public_http
-  to   = module.public_sg.aws_vpc_security_group_ingress_rule.this["http"]
-}
-
-moved {
-  from = aws_vpc_security_group_ingress_rule.public_node_exporter
-  to   = module.public_sg.aws_vpc_security_group_ingress_rule.this["node_exporter"]
-}
-
-moved {
-  from = aws_vpc_security_group_egress_rule.public_all
-  to   = module.public_sg.aws_vpc_security_group_egress_rule.this["all"]
-}
-
-moved {
-  from = aws_security_group.private
-  to   = module.private_sg.aws_security_group.this[0]
-}
-
-moved {
-  from = aws_vpc_security_group_egress_rule.private_all
-  to   = module.private_sg.aws_vpc_security_group_egress_rule.this["all"]
-}
