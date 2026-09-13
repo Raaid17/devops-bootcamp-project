@@ -85,6 +85,10 @@ jobs:
         # otherwise docker_container (image_name_mismatch=recreate by default since
         # community.docker 4) would see a different image name and recreate the
         # container from whatever stale :latest the server had cached.
+        # The port is bound as 0.0.0.0:80:80, not 80:80: the docker CLI stores a bare
+        # 80:80 as HostIp '' while community.docker normalises ports "80:80" to
+        # HostIp 0.0.0.0, and that one-field difference made Ansible recreate the
+        # container after every deploy.
         run: |
           set -euo pipefail
           REPO="${{ needs.build-push.outputs.image }}"
@@ -99,7 +103,7 @@ jobs:
               'docker pull $SHA_IMAGE',
               'docker tag $SHA_IMAGE $REPO:latest',
               'docker rm -f devops-app || true',
-              'docker run -d --name devops-app --restart unless-stopped -p 80:80 $REPO:latest'
+              'docker run -d --name devops-app --restart unless-stopped -p 0.0.0.0:80:80 $REPO:latest'
             ]" \
             --query Command.CommandId --output text)
           echo "command: $CMD_ID"
