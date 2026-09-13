@@ -17,10 +17,10 @@ module "web" {
   name                   = "devops-web-server"
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t3.micro"
-  subnet_id              = aws_subnet.public.id
+  subnet_id              = module.vpc.public_subnets[0]
   private_ip             = var.web_private_ip
   create_security_group  = false
-  vpc_security_group_ids = [aws_security_group.public.id]
+  vpc_security_group_ids = [module.public_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.web.name
 
   tags = { Name = "devops-web-server" }
@@ -29,7 +29,7 @@ module "web" {
 # Elastic IP so the Cloudflare A record survives a stop/start of the instance.
 resource "aws_eip" "web" {
   domain     = "vpc"
-  depends_on = [aws_internet_gateway.main]
+  depends_on = [module.vpc]
 
   tags = { Name = "devops-web-eip" }
 }
@@ -46,10 +46,10 @@ module "controller" {
   name                   = "devops-ansible-controller"
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t3.micro"
-  subnet_id              = aws_subnet.private.id
+  subnet_id              = module.vpc.private_subnets[0]
   private_ip             = var.controller_private_ip
   create_security_group  = false
-  vpc_security_group_ids = [aws_security_group.private.id]
+  vpc_security_group_ids = [module.private_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.controller.name
 
   user_data                   = file("${path.module}/userdata-controller.sh")
@@ -59,7 +59,7 @@ module "controller" {
 
   # Without this the instance can boot before the NAT route exists and its
   # first apt/SSM calls fail against an unreachable network.
-  depends_on = [aws_route_table_association.private]
+  depends_on = [module.vpc]
 }
 
 # t3.small + 16GB: Prometheus, Grafana and cloudflared on a micro is where the
@@ -71,10 +71,10 @@ module "monitoring" {
   name                   = "devops-monitoring-server"
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t3.small"
-  subnet_id              = aws_subnet.private.id
+  subnet_id              = module.vpc.private_subnets[0]
   private_ip             = var.monitoring_private_ip
   create_security_group  = false
-  vpc_security_group_ids = [aws_security_group.private.id]
+  vpc_security_group_ids = [module.private_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.monitoring.name
 
   root_block_device = { size = 16 }
@@ -83,5 +83,5 @@ module "monitoring" {
 
   # Without this the instance can boot before the NAT route exists and its
   # first apt/SSM calls fail against an unreachable network.
-  depends_on = [aws_route_table_association.private]
+  depends_on = [module.vpc]
 }
