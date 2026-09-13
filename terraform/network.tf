@@ -19,8 +19,6 @@ module "vpc" {
   enable_nat_gateway = true
   single_nat_gateway = true
 
-  # The brief grades these exact names. The module's own Name tag comes first in
-  # its merge, so these override it.
   igw_tags                 = { Name = "devops-igw" }
   nat_gateway_tags         = { Name = "devops-ngw" }
   nat_eip_tags             = { Name = "devops-ngw-eip" }
