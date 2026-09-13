@@ -1,3 +1,4 @@
+---
 # Collections and roles the playbooks need. Pinned to the majors verified
 # against ansible-core 2.21 -- install with:
 #   ansible-galaxy install -r requirements.yml
