@@ -2,11 +2,12 @@ name: plan
 
 # Gate on pull requests: formatting, validation, and a real plan against AWS --
 # using a READ-ONLY role, so opening a PR can never change infrastructure.
+#
+# No `paths:` filter on purpose. fmt and plan are REQUIRED checks in the main
+# ruleset; a path-filtered workflow never reports on PRs outside those paths, so
+# such a PR would wait forever for checks that never run and could not be merged.
 on:
   pull_request:
-    paths:
-      - 'terraform/**'
-      - '.github/workflows/plan.yaml'
 
 permissions:
   contents: read
