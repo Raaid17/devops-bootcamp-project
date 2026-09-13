@@ -1,3 +1,4 @@
+---
 - name: Sediakan web server dengan container aplikasi
   hosts: web
   become: true
@@ -14,18 +15,23 @@
 
   tasks:
     - name: Pasang AWS CLI v2
-      include_tasks: tasks/aws-cli.yaml
+      ansible.builtin.include_tasks: tasks/aws-cli.yaml
 
     - name: Dapatkan region dan registry dari imej ECR
-      set_fact:
+      ansible.builtin.set_fact:
         ecr_registry: "{{ ecr_image | regex_replace('/.*$', '') }}"
 
     # Tiada kunci dalam playbook -- instance role devops-web-role yang benarkan
     # tarik imej dari ECR.
     - name: Log masuk ke ECR
-      shell: >
+      ansible.builtin.shell: >
+        set -o pipefail &&
         /usr/local/bin/aws ecr get-login-password --region {{ ansible_aws_ssm_region | default('ap-southeast-1') }}
         | docker login --username AWS --password-stdin {{ ecr_registry }}
+      args:
+        # pipefail is a bash option; /bin/sh on Ubuntu is dash. Without it a
+        # failing `aws` is masked and docker login just reports "password is empty".
+        executable: /bin/bash
       register: ecr_login
       changed_when: false
 

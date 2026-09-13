@@ -1,3 +1,4 @@
+---
 - name: Naikkan stack pemantauan sebagai container
   hosts: monitoring
   become: true
@@ -11,10 +12,10 @@
 
   tasks:
     - name: Pasang AWS CLI v2
-      include_tasks: tasks/aws-cli.yaml
+      ansible.builtin.include_tasks: tasks/aws-cli.yaml
 
     - name: Cipta folder stack
-      file:
+      ansible.builtin.file:
         path: "{{ stack_dir }}"
         state: directory
         mode: "0755"
@@ -22,7 +23,7 @@
     # Token tunnel tidak pernah masuk ke dalam repo -- instance role
     # devops-monitoring-role benarkan baca satu parameter ini sahaja.
     - name: Baca token Cloudflare Tunnel dari SSM Parameter Store
-      shell: >
+      ansible.builtin.shell: >
         /usr/local/bin/aws ssm get-parameter --name {{ tunnel_token_parameter }}
         --with-decryption --region {{ ansible_aws_ssm_region | default('ap-southeast-1') }}
         --query Parameter.Value --output text
@@ -33,18 +34,18 @@
 
     # Stack pemantauan tetap naik walaupun tunnel belum dicipta.
     - name: Tentukan sama ada tunnel boleh dinaikkan
-      set_fact:
+      ansible.builtin.set_fact:
         tunnel_ready: "{{ tunnel_token.rc == 0 and tunnel_token.stdout | default('') | length > 0 }}"
 
     - name: Beritahu jika tunnel dilangkau
-      debug:
+      ansible.builtin.debug:
         msg: >-
           Token tunnel tiada dalam {{ tunnel_token_parameter }} --
           Prometheus dan Grafana akan naik, cloudflared dilangkau.
       when: not tunnel_ready
 
     - name: Hantar fail konfigurasi stack
-      copy:
+      ansible.builtin.copy:
         src: "files/{{ item }}"
         dest: "{{ stack_dir }}/{{ item }}"
         mode: "0644"
@@ -54,7 +55,7 @@
       notify: Naikkan semula stack
 
     - name: Hantar folder provisioning dan dashboard Grafana
-      copy:
+      ansible.builtin.copy:
         src: "files/{{ item }}/"
         dest: "{{ stack_dir }}/{{ item }}/"
         mode: "0644"
@@ -64,7 +65,7 @@
       notify: Naikkan semula stack
 
     - name: Tulis fail .env untuk compose
-      copy:
+      ansible.builtin.copy:
         content: "TUNNEL_TOKEN={{ tunnel_token.stdout | default('') }}\n"
         dest: "{{ stack_dir }}/.env"
         mode: "0600"

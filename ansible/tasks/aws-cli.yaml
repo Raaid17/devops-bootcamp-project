@@ -1,42 +1,43 @@
+---
 # AWS CLI v2 on a target host. Needed because the instance roles are what
 # authorise ECR pulls and Parameter Store reads -- the CLI is how a playbook
 # task actually uses them. `creates:` keeps this idempotent.
 
 - name: Semak AWS CLI sedia ada
-  stat:
+  ansible.builtin.stat:
     path: /usr/local/bin/aws
   register: aws_cli_binary
 
 - name: Pasang unzip
-  apt:
+  ansible.builtin.apt:
     name: unzip
     state: present
-    update_cache: yes
+    update_cache: true
     cache_valid_time: 3600
   when: not aws_cli_binary.stat.exists
 
 - name: Muat turun AWS CLI v2
-  get_url:
+  ansible.builtin.get_url:
     url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
     dest: /tmp/awscliv2.zip
     mode: "0644"
   when: not aws_cli_binary.stat.exists
 
 - name: Nyahzip AWS CLI v2
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/awscliv2.zip
     dest: /tmp
-    remote_src: yes
+    remote_src: true
   when: not aws_cli_binary.stat.exists
 
 - name: Pasang AWS CLI v2
-  command: /tmp/aws/install --update
+  ansible.builtin.command: /tmp/aws/install --update
   args:
     creates: /usr/local/bin/aws
   when: not aws_cli_binary.stat.exists
 
 - name: Buang fail pemasangan
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
