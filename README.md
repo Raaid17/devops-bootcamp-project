@@ -18,7 +18,7 @@ container, dan Cloudflare mendedahkan kedua-dua perkhidmatan.
 | 📊 **Monitoring** | https://monitoring.sirbutterfinger.com |
 | 📦 **Repo** | https://github.com/Raaid17/devops-bootcamp-project |
 
-## Arkitektur
+## Architecture
 
 ```
 AWS · ap-southeast-1
