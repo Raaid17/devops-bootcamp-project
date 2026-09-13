@@ -23,7 +23,7 @@ variable "region" {
 }
 
 variable "state_bucket" {
-  description = "Bucket holding the main stack's Terraform state, and doubling as the Ansible SSM file-transfer bucket."
+  description = "Bucket holding the main stack's Terraform state."
   type        = string
   default     = "devops-bootcamp-terraform-raaid17"
 }
@@ -64,25 +64,6 @@ resource "aws_s3_bucket_public_access_block" "state" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
-}
-
-# The aws_ssm connection plugin leaves one object per task behind. Nothing reads
-# them after the task finishes, so expire them rather than paying to keep them.
-resource "aws_s3_bucket_lifecycle_configuration" "state" {
-  bucket = aws_s3_bucket.state.id
-
-  rule {
-    id     = "expire-ansible-transfer"
-    status = "Enabled"
-
-    filter {
-      prefix = "ansible-transfer/"
-    }
-
-    expiration {
-      days = 1
-    }
-  }
 }
 
 output "state_bucket" {

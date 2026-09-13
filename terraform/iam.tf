@@ -8,7 +8,6 @@ locals {
     }]
   })
 
-  state_bucket_arn = "arn:aws:s3:::${var.state_bucket}"
 }
 
 # ---------------------------------------------------------------------------
@@ -92,12 +91,9 @@ resource "aws_iam_role_policy" "controller_ansible" {
         # The session itself runs through the account-owned shell document.
         # Note the account id in this ARN: SSM-SessionManagerRunShell is owned by
         # the account, unlike the AWS-* documents which have an empty owner field.
-        Effect = "Allow"
-        Action = "ssm:StartSession"
-        Resource = [
-          "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:document/SSM-SessionManagerRunShell",
-          "arn:aws:ssm:${var.region}::document/AWS-StartNonInteractiveCommand",
-        ]
+        Effect   = "Allow"
+        Action   = "ssm:StartSession"
+        Resource = "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:document/SSM-SessionManagerRunShell"
       },
       {
         Effect = "Allow"
@@ -111,21 +107,6 @@ resource "aws_iam_role_policy" "controller_ansible" {
         Effect   = "Allow"
         Action   = "ssm:DescribeSessions"
         Resource = "*"
-      },
-      {
-        # Every task's payload travels through this prefix — see ansible/README.
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-        ]
-        Resource = "${aws_s3_bucket.ansible_transfer.arn}/*"
-      },
-      {
-        Effect   = "Allow"
-        Action   = "s3:ListBucket"
-        Resource = local.state_bucket_arn
       },
     ]
   })
@@ -170,9 +151,11 @@ resource "aws_iam_instance_profile" "monitoring" {
 }
 
 # ---------------------------------------------------------------------------
-# The aws_ssm connection plugin ships every task's payload through S3 -- and
-# BOTH ends touch the bucket: the controller uploads, the target downloads and
-# writes results back. So all three roles need this, not just the controller.
+# The aws_ssm connection plugin ships every task's payload through S3. Only the
+# controller needs bucket permissions: it generates presigned URLs and the
+# targets fetch/upload with curl, so web and monitoring get no S3 access at all.
+# (amazon.aws.aws_ssm docs: "The remote instance does not require IAM
+# credentials for S3.")
 # ---------------------------------------------------------------------------
 
 resource "aws_iam_policy" "ansible_transfer" {
@@ -192,8 +175,8 @@ resource "aws_iam_policy" "ansible_transfer" {
         Resource = "${aws_s3_bucket.ansible_transfer.arn}/*"
       },
       {
-        # GetBucketLocation is how boto3 resolves the bucket's region before it
-        # can sign a request for it; ListBucket is scoped by the same prefix.
+        # The plugin resolves the bucket's region (HeadBucket, authorised by
+        # ListBucket) before it can presign a URL for it.
         Effect   = "Allow"
         Action   = ["s3:GetBucketLocation", "s3:ListBucket"]
         Resource = aws_s3_bucket.ansible_transfer.arn
@@ -203,12 +186,13 @@ resource "aws_iam_policy" "ansible_transfer" {
 }
 
 resource "aws_iam_role_policy_attachment" "ansible_transfer" {
-  for_each = {
-    controller = aws_iam_role.controller.name
-    web        = aws_iam_role.web.name
-    monitoring = aws_iam_role.monitoring.name
-  }
-
-  role       = each.value
+  role       = aws_iam_role.controller.name
   policy_arn = aws_iam_policy.ansible_transfer.arn
+}
+
+# Was a for_each over all three roles. Moving the controller's instance keeps its
+# attachment in place (no destroy/create gap); web and monitoring are dropped.
+moved {
+  from = aws_iam_role_policy_attachment.ansible_transfer["controller"]
+  to   = aws_iam_role_policy_attachment.ansible_transfer
 }

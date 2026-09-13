@@ -50,17 +50,17 @@ Tiada mana-mana security group membuka port 22, dan tiada `key_name` pada mana-m
 instance. Ansible bercakap dengan kedua-dua sasaran melalui **AWS Systems Manager**.
 
 ```ini
-ansible_connection=community.aws.aws_ssm
+ansible_connection=amazon.aws.aws_ssm
 ```
 
 Plugin ini **wajib** ada bucket S3 untuk memindah fail — walaupun untuk modul yang tidak
 menghantar fail. Objek ditulis di akar bucket dengan kunci `<instance-id>/<laluan>`, jadi
 prefix tidak boleh digunakan untuk mengehadkan akses. Sebab itu ia menggunakan bucket
-**berasingan** daripada bucket state, supaya state Terraform kekal terasing.
+**berasingan** daripada bucket state, supaya state Terraform kekal terasing. Hanya controller
+ada akses kepada bucket itu — sasaran menerima *presigned URL* dan tidak perlukan kebenaran S3.
 
-> Plugin ini berpindah ke `amazon.aws.aws_ssm` dalam keluaran yang lebih baharu. Ubuntu
-> 24.04 menghantar ansible-core 2.16 dengan amazon.aws 7.2 yang **tiada** plugin connection
-> langsung — pada versi itu ia masih `community.aws`.
+Controller menjalankan **ansible-core 2.21** dalam virtualenv, bukan pakej apt Ubuntu 24.04
+(2.16, EOL sejak Julai 2025). Versi koleksi dipin dalam `ansible/requirements.yml`.
 
 ## Cara menjalankan
 
@@ -74,10 +74,10 @@ cd ..                  && terraform init && terraform apply
 ### 2 · Ansible — dari controller, bukan dari laptop
 
 ```bash
-aws ssm start-session --target i-09cb436d4016ca094 --region ap-southeast-1
+$(cd terraform && terraform output -raw controller_session_command)
 sudo su - ubuntu
-git clone https://github.com/Raaid17/devops-bootcamp-project.git
-cd devops-bootcamp-project/ansible
+cd devops-bootcamp-project && git pull   # user_data sudah clone repo + pasang koleksi
+cd ansible
 
 ansible all -m ping
 ansible-playbook playbook-web.yaml
@@ -104,9 +104,9 @@ ansible-playbook playbook-monitoring.yaml
 | Bucket state | `devops-bootcamp-terraform-raaid17` |
 | Bucket transfer Ansible | `devops-bootcamp-ansible-transfer-raaid17` |
 | Repositori ECR | `396608796485.dkr.ecr.ap-southeast-1.amazonaws.com/devops-bootcamp/final-project-raaid17` |
-| Web server | `i-05c79e3f5c3218463` · 10.0.0.5 |
-| Ansible controller | `i-09cb436d4016ca094` · 10.0.0.135 |
-| Monitoring server | `i-09cb396686001557d` · 10.0.0.136 |
+| Web server | 10.0.0.5 · `terraform output web_instance_id` |
+| Ansible controller | 10.0.0.135 · `terraform output controller_instance_id` |
+| Monitoring server | 10.0.0.136 · `terraform output monitoring_instance_id` |
 
 ## CI/CD
 
@@ -125,7 +125,7 @@ server, dan deploy tidak boleh membaca seluruh akaun.
 | Role | Dibenarkan |
 |---|---|
 | `devops-web-role` | SSM agent · tarik satu repo ECR sahaja |
-| `devops-controller-role` | SSM agent · `StartSession` kepada **dua** instance sahaja · bucket transfer |
+| `devops-controller-role` | SSM agent · `StartSession` kepada **dua** instance sahaja · satu-satunya role dengan akses bucket transfer |
 | `devops-monitoring-role` | SSM agent · baca **satu** parameter SSM sahaja |
 | `devops-github-actions-role` | tolak ke ECR · `SendCommand` kepada web server sahaja |
 | `devops-github-plan-role` | `ReadOnlyAccess` |

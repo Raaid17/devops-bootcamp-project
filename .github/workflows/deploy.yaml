@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
       - run: npm clean-install
       - run: npm run test
 
@@ -79,19 +79,27 @@ jobs:
       # No SSH and no self-hosted runner: the deploy is an SSM command, scoped
       # by IAM to this one instance.
       - name: Pull and restart on the web server
+        # The commit image is pulled by SHA (so a rollback target always exists in
+        # ECR), then tagged locally as :latest and run FROM :latest. That keeps the
+        # running container identical to what ansible/playbook-web.yaml declares --
+        # otherwise docker_container (image_name_mismatch=recreate by default since
+        # community.docker 4) would see a different image name and recreate the
+        # container from whatever stale :latest the server had cached.
         run: |
           set -euo pipefail
-          IMAGE="${{ needs.build-push.outputs.image }}:${{ github.sha }}"
+          REPO="${{ needs.build-push.outputs.image }}"
+          SHA_IMAGE="$REPO:${{ github.sha }}"
           CMD_ID=$(aws ssm send-command \
             --instance-ids "${{ vars.WEB_INSTANCE_ID }}" \
             --document-name AWS-RunShellScript \
             --comment "deploy ${{ github.sha }}" \
             --parameters "commands=[
               'set -e',
-              'aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${{ needs.build-push.outputs.image }}',
-              'docker pull $IMAGE',
+              'aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${REPO%%/*}',
+              'docker pull $SHA_IMAGE',
+              'docker tag $SHA_IMAGE $REPO:latest',
               'docker rm -f devops-app || true',
-              'docker run -d --name devops-app --restart unless-stopped -p 80:80 $IMAGE'
+              'docker run -d --name devops-app --restart unless-stopped -p 80:80 $REPO:latest'
             ]" \
             --query Command.CommandId --output text)
           echo "command: $CMD_ID"
